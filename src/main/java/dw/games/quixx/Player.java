@@ -2,49 +2,89 @@ package dw.games.quixx;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
-public class Player {
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
-	private Card card = new Card();
+@RequiredArgsConstructor
+public class Player implements Comparable<Player> {
 
-	public List<Option> computeGeneralOptions(Dice dices) {
-		List<Option> res = new ArrayList<>();
-		int wsum = dices.getWhite1() + dices.getWhite2();
-		for (Color c : Color.values()) {
-			if (card.canMark(c, wsum))
-				res.add(new Option(c, wsum));
-		}
-		return res;
-	}
+    @Getter private Card card = new Card(this);
+    private final String name;
 
-	public List<Option> computeOwnOptions(Dice dices) {
-		List<Option> res = new ArrayList<>();
-		for (Color c : Color.values()) {
-			int sum = dices.getWhite1() + dices.eyes(c);
-			if (card.canMark(c, sum))
-				res.add(new Option(c, sum));
-			sum = dices.getWhite2() + dices.eyes(c);
-			if (card.canMark(c, sum))
-				res.add(new Option(c, sum));
-		}
-		return res;
-	}
+    public List<Option> computeWhiteDiceOptions(Dice dices) {
+        List<Option> res = new ArrayList<>();
+        int wsum = dices.getWhite1() + dices.getWhite2();
+        for (Color c : Color.values()) {
+            addOptionsForValue(res, wsum, c);
+        }
+        return res;
+    }
 
-	public List<Option> choose(List<Option> opt, List<Option> ownOpt) {
-		List<Option> res = new ArrayList<>(2);
-		return res;
-	}
+    public List<Option> computeColorDiceOptions(Dice dices) {
+        List<Option> res = new ArrayList<>();
+        for (Color c : Color.values()) {
+            int sum = dices.getWhite1() + dices.eyes(c);
+            addOptionsForValue(res, sum, c);
+            sum = dices.getWhite2() + dices.eyes(c);
+            addOptionsForValue(res, sum, c);
+        }
+        return res;
+    }
 
-	public void apply(Option o) {
-		if (Option.SKIP.equals(o)) {
-			card.markSkipped();
-			return;
-		}
-		card.mark(o);
-	}
+    private void addOptionsForValue(List<Option> res, int value, Color c) {
+        if (card.canMark(c, value)) {
+            res.add(new Option(c, value, false));
+            if (card.canCloseMarking(c, value)) {
+                res.add(new Option(c, value, true));
+            }
+        }
+        if (card.canClose(c)) {
+            res.add(new Option(c, -1, true));
+        }
+    }
 
-//	if (card.getFailedPlacements() <= Quixx.MAX_FAILED_MOVES) {
-//	res.add(Action.Skip);
-//}
+    public List<Option> choose(List<Option> opt, List<Option> ownOpt) {
+        List<Option> res = new ArrayList<>(2);
+        Random r = new Random();
+        if (r.nextDouble() < .05) {
+            return res;
+        }
+        if (!opt.isEmpty()) {
+            res.add(opt.get(r.nextInt(opt.size())));
+        }
+        if (r.nextDouble() < .05) {
+            return res;
+        }
+        if (!ownOpt.isEmpty()) {
+            res.add(ownOpt.get(r.nextInt(ownOpt.size())));
+        }
+        return res;
+    }
+
+    public void apply(Option o) {
+        card.markField(o);
+        if (o.isClose()) {
+            card.close(o.getColor());
+        }
+    }
+
+    public int getScore() {
+        return card.getScore();
+    }
+
+    @Override
+    public int compareTo(Player o) {
+        return o.getScore() - getScore();
+    }
+
+    public String toString() {
+        return name;
+    }
+
+    public void skip() {
+        card.markSkipped();
+    }
 
 }
